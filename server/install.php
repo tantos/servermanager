@@ -4,11 +4,33 @@
  * Run this script to set up the database and initial configuration
  */
 
-// Load CodeIgniter
-require_once 'vendor/autoload.php';
+// Set the path to the project root
+$projectRoot = __DIR__;
 
-use CodeIgniter\Config\Services;
-use CodeIgniter\Database\BaseConnection;
+// Load Composer autoloader
+require_once $projectRoot . '/vendor/autoload.php';
+
+// Set the path to the system directory
+$systemPath = $projectRoot . '/vendor/codeigniter4/framework/system';
+
+// Set the path to the app directory
+$appPath = $projectRoot . '/app';
+
+// Set the path to the writable directory
+$writablePath = $projectRoot . '/writable';
+
+// Set the path to the tests directory
+$testsPath = $projectRoot . '/tests';
+
+// Set the path to the view directory
+$viewPath = $appPath . '/Views';
+
+// Load the paths config file
+require_once $systemPath . '/bootstrap.php';
+
+// Initialize CodeIgniter
+$app = \Config\Services::codeigniter();
+$app->initialize();
 
 echo "=== Multi-Server Control Panel Installation ===\n\n";
 
@@ -16,7 +38,7 @@ try {
     // Test database connection
     echo "1. Testing database connection...\n";
     
-    $db = Services::database();
+    $db = \Config\Services::database();
     $db->connect();
     
     if ($db->isConnected()) {
@@ -28,7 +50,7 @@ try {
     // Run migrations
     echo "\n2. Running database migrations...\n";
     
-    $migrate = Services::migrations();
+    $migrate = \Config\Services::migrations();
     $migrate->setNamespace('App');
     
     try {
@@ -42,7 +64,7 @@ try {
     // Run seeders
     echo "\n3. Running database seeders...\n";
     
-    $seeder = Services::seeder();
+    $seeder = \Config\Services::seeder();
     $seeder->setNamespace('App');
     
     try {

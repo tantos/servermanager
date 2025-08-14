@@ -49,8 +49,8 @@ class Config:
         '8.4': '/etc/php/8.4/fpm/php.ini'
     }
     
-    # Log files
-    LOG_FILE = '/var/log/server-agent.log'
+    # Log files - using local directory instead of system log
+    LOG_FILE = 'logs/server-agent.log'
     
     @classmethod
     def get_allowed_commands(cls):
