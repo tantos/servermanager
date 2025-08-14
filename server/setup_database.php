@@ -1,19 +1,15 @@
 <?php
 /**
  * Database Setup Script
- * Creates the database if it doesn't exist
- * Configuration is read from .env file
+ * Creates the servermanager database if it doesn't exist
  */
 
-// Load environment variables from .env file
-function loadEnv($file) {
-    if (!file_exists($file)) {
-        echo "Error: .env file not found. Please create it first.\n";
-        exit(1);
-    }
-    
-    $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    $env = [];
+// Load environment variables
+$envFile = __DIR__ . '/.env';
+$envVars = [];
+
+if (file_exists($envFile)) {
+    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     
     foreach ($lines as $line) {
         if (strpos($line, '=') !== false && strpos($line, '#') !== 0) {
@@ -26,69 +22,50 @@ function loadEnv($file) {
                 $value = $matches[2];
             }
             
-            $env[$key] = $value;
+            $envVars[$key] = $value;
         }
     }
-    
-    return $env;
 }
 
-echo "=== Database Setup ===\n\n";
+// Database connection details
+$host = $envVars['database.default.hostname'] ?? 'localhost';
+$port = $envVars['database.default.port'] ?? 3306;
+$username = $envVars['database.default.username'] ?? 'root';
+$password = $envVars['database.default.password'] ?? '';
+$database = $envVars['database.default.database'] ?? 'servermanager';
 
-// Load configuration
-$env = loadEnv('.env');
+echo "=== Database Setup ===\n";
+echo "Host: $host\n";
+echo "Port: $port\n";
+echo "Username: $username\n";
+echo "Database: $database\n\n";
 
-// Database connection parameters
-$host = $env['database.default.hostname'] ?? 'localhost';
-$port = (int)($env['database.default.port'] ?? 3306);
-$username = $env['database.default.username'] ?? 'root';
-$password = $env['database.default.password'] ?? '';
-$database = $env['database.default.database'] ?? 'servermanager';
+// Connect to MySQL server (without specifying database)
+$mysqli = new mysqli($host, $username, $password, '', $port);
 
-try {
-    // Connect to MySQL without selecting a database
-    $mysqli = new mysqli($host, $username, $password, '', $port);
+if ($mysqli->connect_error) {
+    die("Connection failed: " . $mysqli->connect_error . "\n");
+}
+
+echo "✅ Connected to MySQL server successfully\n";
+
+// Check if database exists
+$result = $mysqli->query("SHOW DATABASES LIKE '$database'");
+
+if ($result->num_rows > 0) {
+    echo "✅ Database '$database' already exists\n";
+} else {
+    // Create database
+    $sql = "CREATE DATABASE `$database` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci";
     
-    // Check connection
-    if ($mysqli->connect_error) {
-        throw new Exception("Connection failed: " . $mysqli->connect_error);
-    }
-    
-    echo "✓ Connected to MySQL server successfully\n";
-    
-    // Check if database exists
-    $result = $mysqli->query("SHOW DATABASES LIKE '$database'");
-    $dbExists = $result->num_rows > 0;
-    
-    if ($dbExists) {
-        echo "✓ Database '$database' already exists\n";
+    if ($mysqli->query($sql)) {
+        echo "✅ Database '$database' created successfully\n";
     } else {
-        // Create database
-        $mysqli->query("CREATE DATABASE `$database` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci");
-        echo "✓ Database '$database' created successfully\n";
+        die("❌ Error creating database: " . $mysqli->error . "\n");
     }
-    
-    // Test connection to the specific database
-    $mysqli->close();
-    $mysqli = new mysqli($host, $username, $password, $database, $port);
-    
-    if ($mysqli->connect_error) {
-        throw new Exception("Failed to connect to database '$database': " . $mysqli->connect_error);
-    }
-    
-    echo "✓ Successfully connected to database '$database'\n";
-    echo "\nDatabase setup completed successfully!\n";
-    echo "You can now run: php install_simple.php\n";
-    
-    $mysqli->close();
-    
-} catch (Exception $e) {
-    echo "❌ Database setup failed: " . $e->getMessage() . "\n";
-    echo "\nPlease check:\n";
-    echo "1. .env file exists and is properly configured\n";
-    echo "2. MySQL server is running\n";
-    echo "3. User '$username' has sufficient privileges\n";
-    echo "4. Port $port is correct\n";
-    echo "5. Password is correct\n";
-    exit(1);
-} 
+}
+
+$mysqli->close();
+
+echo "\n✅ Database setup completed successfully!\n";
+echo "You can now run the installation script.\n"; 

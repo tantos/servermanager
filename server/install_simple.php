@@ -1,20 +1,15 @@
 <?php
 /**
  * Simple Installation Script for Multi-Server Control Panel
- * Sets up database and tables manually using MySQLi
- * Configuration is read from .env file
+ * Creates all necessary database tables and initial data
  */
 
-echo "=== Multi-Server Control Panel Installation ===\n\n";
+// Load environment variables
+$envFile = __DIR__ . '/.env';
+$envVars = [];
 
-// Load environment variables from .env file
-function loadEnv($file) {
-    if (!file_exists($file)) {
-        throw new Exception(".env file not found. Please create it first.");
-    }
-    
-    $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    $env = [];
+if (file_exists($envFile)) {
+    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     
     foreach ($lines as $line) {
         if (strpos($line, '=') !== false && strpos($line, '#') !== 0) {
@@ -27,315 +22,235 @@ function loadEnv($file) {
                 $value = $matches[2];
             }
             
-            $env[$key] = $value;
+            $envVars[$key] = $value;
         }
     }
-    
-    return $env;
 }
 
-try {
-    // Load .env file
-    echo "1. Loading configuration from .env file...\n";
-    $env = loadEnv('.env');
-    
-    // Extract database configuration
-    $host = $env['database.default.hostname'] ?? 'localhost';
-    $port = (int)($env['database.default.port'] ?? 3306);
-    $username = $env['database.default.username'] ?? 'root';
-    $password = $env['database.default.password'] ?? '';
-    $database = $env['database.default.database'] ?? 'servermanager';
-    
-    echo "   ✓ Configuration loaded successfully\n";
-    echo "   Database: {$database} on {$host}:{$port}\n";
-    
-    // Connect to database using MySQLi
-    echo "\n2. Testing database connection...\n";
-    
-    $mysqli = new mysqli($host, $username, $password, $database, $port);
-    
-    // Check connection
-    if ($mysqli->connect_error) {
-        throw new Exception("Connection failed: " . $mysqli->connect_error);
-    }
-    
-    // Set charset
-    $mysqli->set_charset("utf8mb4");
-    
-    echo "   ✓ Database connection successful\n";
-    
-    // Drop existing tables if they exist (clean install)
-    echo "\n3. Preparing database...\n";
-    
-    $tables = ['command_history', 'server_sites', 'server_keys', 'servers', 'users'];
-    
-    foreach ($tables as $table) {
-        $mysqli->query("DROP TABLE IF EXISTS `$table`");
-    }
-    
-    echo "   ✓ Database prepared for clean installation\n";
-    
-    // Create tables
-    echo "\n4. Creating database tables...\n";
-    
-    // Users table
-    $sql = "CREATE TABLE `users` (
-        `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-        `username` varchar(100) NOT NULL,
-        `email` varchar(255) NOT NULL,
-        `password_hash` varchar(255) NOT NULL,
-        `full_name` varchar(255) NOT NULL,
-        `role` enum('admin','user','viewer') NOT NULL DEFAULT 'user',
-        `is_active` tinyint(1) NOT NULL DEFAULT 1,
-        `last_login` datetime NULL,
-        `created_at` datetime NOT NULL,
-        `updated_at` datetime NOT NULL,
-        PRIMARY KEY (`id`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
-    
-    if (!$mysqli->query($sql)) {
-        throw new Exception("Failed to create users table: " . $mysqli->error);
-    }
-    echo "   ✓ Users table created\n";
-    
-    // Add unique constraints after table creation
-    $mysqli->query("ALTER TABLE `users` ADD UNIQUE KEY `username` (`username`)");
-    $mysqli->query("ALTER TABLE `users` ADD UNIQUE KEY `email` (`email`)");
-    
-    // Servers table
-    $sql = "CREATE TABLE `servers` (
-        `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-        `name` varchar(255) NOT NULL,
-        `hostname` varchar(255) NOT NULL,
-        `ip_address` varchar(45) NOT NULL,
-        `port` int(5) NOT NULL DEFAULT 6969,
-        `description` text NULL,
-        `os_info` varchar(255) NULL,
-        `status` enum('online','offline','maintenance') NOT NULL DEFAULT 'offline',
-        `last_seen` datetime NULL,
-        `is_active` tinyint(1) NOT NULL DEFAULT 1,
-        `created_at` datetime NOT NULL,
-        `updated_at` datetime NOT NULL,
-        PRIMARY KEY (`id`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
-    
-    if (!$mysqli->query($sql)) {
-        throw new Exception("Failed to create servers table: " . $mysqli->error);
-    }
-    echo "   ✓ Servers table created\n";
-    
-    // Add indexes after table creation
-    $mysqli->query("ALTER TABLE `servers` ADD KEY `hostname` (`hostname`)");
-    $mysqli->query("ALTER TABLE `servers` ADD KEY `ip_address` (`ip_address`)");
-    $mysqli->query("ALTER TABLE `servers` ADD KEY `status` (`status`)");
-    
-    // Server keys table
-    $sql = "CREATE TABLE `server_keys` (
-        `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-        `server_id` int(11) unsigned NOT NULL,
-        `key_name` varchar(255) NOT NULL,
-        `public_key` text NOT NULL,
-        `key_type` enum('rsa','ed25519') NOT NULL DEFAULT 'rsa',
-        `key_size` int(5) NOT NULL DEFAULT 2048,
-        `fingerprint` varchar(64) NOT NULL,
-        `is_active` tinyint(1) NOT NULL DEFAULT 1,
-        `created_at` datetime NOT NULL,
-        `updated_at` datetime NOT NULL,
-        PRIMARY KEY (`id`),
-        KEY `server_id` (`server_id`),
-        KEY `fingerprint` (`fingerprint`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
-    
-    if (!$mysqli->query($sql)) {
-        throw new Exception("Failed to create server_keys table: " . $mysqli->error);
-    }
-    echo "   ✓ Server keys table created\n";
-    
-    // Server sites table
-    $sql = "CREATE TABLE `server_sites` (
-        `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-        `server_id` int(11) unsigned NOT NULL,
-        `site_name` varchar(255) NOT NULL,
-        `document_root` varchar(500) NOT NULL,
-        `server_name` varchar(255) NOT NULL,
-        `server_alias` text NULL,
-        `php_version` varchar(10) NULL,
-        `is_enabled` tinyint(1) NOT NULL DEFAULT 0,
-        `ssl_enabled` tinyint(1) NOT NULL DEFAULT 0,
-        `ssl_cert_path` varchar(500) NULL,
-        `ssl_key_path` varchar(500) NULL,
-        `created_at` datetime NOT NULL,
-        `updated_at` datetime NOT NULL,
-        PRIMARY KEY (`id`),
-        KEY `server_id` (`server_id`),
-        KEY `site_name` (`site_name`),
-        KEY `is_enabled` (`is_enabled`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
-    
-    if (!$mysqli->query($sql)) {
-        throw new Exception("Failed to create server_sites table: " . $mysqli->error);
-    }
-    echo "   ✓ Server sites table created\n";
-    
-    // Command history table
-    $sql = "CREATE TABLE `command_history` (
-        `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-        `server_id` int(11) unsigned NOT NULL,
-        `user_id` int(11) unsigned NOT NULL,
-        `command` text NOT NULL,
-        `output` longtext NULL,
-        `error` text NULL,
-        `exit_code` int(11) NOT NULL DEFAULT 0,
-        `execution_time` float NULL,
-        `status` enum('success','failed','timeout') NOT NULL DEFAULT 'success',
-        `ip_address` varchar(45) NULL,
-        `user_agent` text NULL,
-        `created_at` datetime NOT NULL,
-        PRIMARY KEY (`id`),
-        KEY `server_id` (`server_id`),
-        KEY `user_id` (`user_id`),
-        KEY `status` (`status`),
-        KEY `created_at` (`created_at`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
-    
-    if (!$mysqli->query($sql)) {
-        throw new Exception("Failed to create command_history table: " . $mysqli->error);
-    }
-    echo "   ✓ Command history table created\n";
-    
-    // Insert default users
-    echo "\n5. Creating default users...\n";
-    
-    $stmt = $mysqli->prepare("INSERT INTO users (username, email, password_hash, full_name, role, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())");
-    
-    if (!$stmt) {
-        throw new Exception("Failed to prepare statement: " . $mysqli->error);
-    }
-    
-    $stmt->bind_param("sssssi", $username, $email, $password_hash, $full_name, $role, $is_active);
-    
-    // Admin user
-    $username = 'admin';
-    $email = 'admin@server-manager.local';
-    $password_hash = password_hash('admin123', PASSWORD_DEFAULT);
-    $full_name = 'System Administrator';
-    $role = 'admin';
-    $is_active = 1;
-    
-    if (!$stmt->execute()) {
-        throw new Exception("Failed to create admin user: " . $stmt->error);
-    }
-    echo "   ✓ Admin user created\n";
-    
-    // Regular user
-    $username = 'user';
-    $email = 'user@server-manager.local';
-    $password_hash = password_hash('user123', PASSWORD_DEFAULT);
-    $full_name = 'Regular User';
-    $role = 'user';
-    $is_active = 1;
-    
-    if (!$stmt->execute()) {
-        throw new Exception("Failed to create regular user: " . $stmt->error);
-    }
-    echo "   ✓ Regular user created\n";
-    
-    $stmt->close();
-    
-    // Create necessary directories
-    echo "\n6. Creating necessary directories...\n";
-    
-    $dirs = [
-        'writable/logs',
-        'writable/cache',
-        'writable/sessions',
-        'writable/uploads',
-        'keys'
-    ];
-    
-    foreach ($dirs as $dir) {
-        if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
-            echo "   ✓ Created directory: {$dir}\n";
-        } else {
-            echo "   ✓ Directory already exists: {$dir}\n";
-        }
-    }
-    
-    // Generate RSA keys for control panel
-    echo "\n7. Generating RSA keys for control panel...\n";
-    
-    $privateKeyPath = $env['RSA_PRIVATE_KEY_PATH'] ?? 'keys/private_key.pem';
-    $publicKeyPath = $env['RSA_PUBLIC_KEY_PATH'] ?? 'keys/public_key.pem';
-    
-    if (!file_exists($privateKeyPath)) {
-        $config = [
-            "private_key_bits" => 2048,
-            "private_key_type" => OPENSSL_KEYTYPE_RSA,
-        ];
-        
-        $res = openssl_pkey_new($config);
-        openssl_pkey_export($res, $privateKey);
-        $publicKey = openssl_pkey_get_details($res)['key'];
-        
-        file_put_contents($privateKeyPath, $privateKey);
-        file_put_contents($publicKeyPath, $publicKey);
-        
-        echo "   ✓ RSA keys generated successfully\n";
-        echo "   Private key: {$privateKeyPath}\n";
-        echo "   Public key: {$publicKeyPath}\n";
+// Database connection details
+$host = $envVars['database.default.hostname'] ?? 'localhost';
+$port = $envVars['database.default.port'] ?? 3306;
+$username = $envVars['database.default.username'] ?? 'root';
+$password = $envVars['database.default.password'] ?? '';
+$database = $envVars['database.default.database'] ?? 'servermanager';
+
+echo "=== Multi-Server Control Panel Installation ===\n";
+echo "Host: $host\n";
+echo "Port: $port\n";
+echo "Username: $username\n";
+echo "Database: $database\n\n";
+
+// Connect to database
+$mysqli = new mysqli($host, $username, $password, $database, $port);
+
+if ($mysqli->connect_error) {
+    die("Connection failed: " . $mysqli->connect_error . "\n");
+}
+
+echo "✅ Connected to database successfully\n";
+
+// Drop existing tables for clean install
+echo "\n🗑️  Dropping existing tables...\n";
+$tables = [
+    'command_history',
+    'server_sites', 
+    'server_keys',
+    'servers',
+    'users'
+];
+
+foreach ($tables as $table) {
+    $mysqli->query("DROP TABLE IF EXISTS `$table`");
+    echo "  - Dropped table: $table\n";
+}
+
+// Create users table
+echo "\n📋 Creating users table...\n";
+$sql = "CREATE TABLE `users` (
+    `id` int(11) NOT NULL AUTO_INCREMENT,
+    `username` varchar(50) NOT NULL,
+    `email` varchar(100) NOT NULL,
+    `password_hash` varchar(255) NOT NULL,
+    `full_name` varchar(100) NOT NULL,
+    `role` enum('admin','user') NOT NULL DEFAULT 'user',
+    `is_active` tinyint(1) NOT NULL DEFAULT 1,
+    `last_login` datetime NULL,
+    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `username` (`username`),
+    UNIQUE KEY `email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
+
+if ($mysqli->query($sql)) {
+    echo "✅ Users table created successfully\n";
+} else {
+    die("❌ Error creating users table: " . $mysqli->error . "\n");
+}
+
+// Create servers table
+echo "\n📋 Creating servers table...\n";
+$sql = "CREATE TABLE `servers` (
+    `id` int(11) NOT NULL AUTO_INCREMENT,
+    `name` varchar(100) NOT NULL,
+    `hostname` varchar(100) NOT NULL,
+    `ip_address` varchar(45) NOT NULL,
+    `port` int(11) NOT NULL DEFAULT 6969,
+    `description` text NULL,
+    `os_info` varchar(200) NULL,
+    `status` enum('online','offline','error') NOT NULL DEFAULT 'offline',
+    `last_seen` datetime NULL,
+    `is_active` tinyint(1) NOT NULL DEFAULT 1,
+    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_ip_address` (`ip_address`),
+    KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
+
+if ($mysqli->query($sql)) {
+    echo "✅ Servers table created successfully\n";
+} else {
+    die("❌ Error creating servers table: " . $mysqli->error . "\n");
+}
+
+// Create server_keys table
+echo "\n📋 Creating server_keys table...\n";
+$sql = "CREATE TABLE `server_keys` (
+    `id` int(11) NOT NULL AUTO_INCREMENT,
+    `server_id` int(11) NOT NULL,
+    `key_name` varchar(100) NOT NULL,
+    `public_key` text NOT NULL,
+    `key_type` varchar(20) NOT NULL DEFAULT 'RSA',
+    `key_size` int(11) NOT NULL DEFAULT 2048,
+    `fingerprint` varchar(64) NULL,
+    `is_active` tinyint(1) NOT NULL DEFAULT 1,
+    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_server_id` (`server_id`),
+    KEY `idx_key_name` (`key_name`),
+    CONSTRAINT `fk_server_keys_server` FOREIGN KEY (`server_id`) REFERENCES `servers` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
+
+if ($mysqli->query($sql)) {
+    echo "✅ Server keys table created successfully\n";
+} else {
+    die("❌ Error creating server keys table: " . $mysqli->error . "\n");
+}
+
+// Create server_sites table
+echo "\n📋 Creating server_sites table...\n";
+$sql = "CREATE TABLE `server_sites` (
+    `id` int(11) NOT NULL AUTO_INCREMENT,
+    `server_id` int(11) NOT NULL,
+    `site_name` varchar(100) NOT NULL,
+    `document_root` varchar(255) NOT NULL,
+    `server_name` varchar(200) NOT NULL,
+    `server_alias` varchar(200) NULL,
+    `php_version` varchar(10) NULL,
+    `is_enabled` tinyint(1) NOT NULL DEFAULT 1,
+    `ssl_enabled` tinyint(1) NOT NULL DEFAULT 0,
+    `ssl_cert_path` varchar(255) NULL,
+    `ssl_key_path` varchar(255) NULL,
+    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_server_id` (`server_id`),
+    KEY `idx_site_name` (`site_name`),
+    CONSTRAINT `fk_server_sites_server` FOREIGN KEY (`server_id`) REFERENCES `servers` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
+
+if ($mysqli->query($sql)) {
+    echo "✅ Server sites table created successfully\n";
+} else {
+    die("❌ Error creating server sites table: " . $mysqli->error . "\n");
+}
+
+// Create command_history table
+echo "\n📋 Creating command_history table...\n";
+$sql = "CREATE TABLE `command_history` (
+    `id` int(11) NOT NULL AUTO_INCREMENT,
+    `server_id` int(11) NOT NULL,
+    `user_id` int(11) NOT NULL,
+    `command` text NOT NULL,
+    `output` longtext NULL,
+    `error` text NULL,
+    `exit_code` int(11) NULL,
+    `execution_time` decimal(10,3) NULL,
+    `status` enum('success','error','timeout') NOT NULL DEFAULT 'success',
+    `ip_address` varchar(45) NULL,
+    `user_agent` text NULL,
+    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_server_id` (`server_id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_created_at` (`created_at`),
+    CONSTRAINT `fk_command_history_server` FOREIGN KEY (`server_id`) REFERENCES `servers` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_command_history_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
+
+if ($mysqli->query($sql)) {
+    echo "✅ Command history table created successfully\n";
+} else {
+    die("❌ Error creating command history table: " . $mysqli->error . "\n");
+}
+
+// Insert default users
+echo "\n👥 Inserting default users...\n";
+$adminPassword = password_hash('admin123', PASSWORD_DEFAULT);
+$userPassword = password_hash('user123', PASSWORD_DEFAULT);
+
+$stmt = $mysqli->prepare("INSERT INTO users (username, email, password_hash, full_name, role) VALUES (?, ?, ?, ?, ?)");
+
+// Admin user
+$adminUsername = 'admin';
+$adminEmail = 'admin@example.com';
+$adminFullName = 'System Administrator';
+$adminRole = 'admin';
+
+$stmt->bind_param("sssss", $adminUsername, $adminEmail, $adminPassword, $adminFullName, $adminRole);
+if ($stmt->execute()) {
+    echo "✅ Admin user created (username: admin, password: admin123)\n";
+} else {
+    echo "❌ Error creating admin user: " . $stmt->error . "\n";
+}
+
+// Regular user
+$userUsername = 'user';
+$userEmail = 'user@example.com';
+$userFullName = 'Regular User';
+$userRole = 'user';
+
+$stmt->bind_param("sssss", $userUsername, $userEmail, $userPassword, $userFullName, $userRole);
+if ($stmt->execute()) {
+    echo "✅ Regular user created (username: user, password: user123)\n";
+} else {
+    echo "❌ Error creating regular user: " . $stmt->error . "\n";
+}
+
+$stmt->close();
+
+// Create keys directory
+echo "\n🔑 Creating keys directory...\n";
+$keysDir = __DIR__ . '/keys';
+if (!is_dir($keysDir)) {
+    if (mkdir($keysDir, 0755, true)) {
+        echo "✅ Keys directory created successfully\n";
     } else {
-        echo "   ✓ RSA keys already exist\n";
+        echo "⚠️  Warning: Could not create keys directory\n";
     }
-    
-    // Set proper permissions
-    echo "\n8. Setting file permissions...\n";
-    
-    chmod($privateKeyPath, 0600);
-    chmod($publicKeyPath, 0644);
-    chmod('keys', 0755);
-    
-    echo "   ✓ File permissions set correctly\n";
-    
-    // Close database connection
-    $mysqli->close();
-    
-    // Installation complete
-    echo "\n=== Installation Complete! ===\n\n";
-    
-    echo "Default login credentials:\n";
-    echo "Username: admin\n";
-    echo "Password: admin123\n\n";
-    
-    echo "Username: user\n";
-    echo "Password: user123\n\n";
-    
-    echo "Next steps:\n";
-    echo "1. Start your web server\n";
-    echo "2. Navigate to the control panel\n";
-    echo "3. Log in with admin credentials\n";
-    echo "4. Add your first server in Settings\n";
-    echo "5. Install the server agent on your Ubuntu servers\n\n";
-    
-    echo "Important security notes:\n";
-    echo "- Change default passwords after first login\n";
-    echo "- Keep RSA keys secure and private\n";
-    echo "- Use VPN for server-agent communication\n";
-    echo "- Regularly backup your database\n\n";
-    
-} catch (Exception $e) {
-    echo "❌ Installation failed: " . $e->getMessage() . "\n";
-    echo "\nPlease check:\n";
-    echo "1. .env file exists and is properly configured\n";
-    echo "2. Database connection settings in .env file\n";
-    echo "3. Database server is running\n";
-    echo "4. User has sufficient privileges\n";
-    echo "5. PHP extensions: openssl, mysqli\n";
-    
-    // Close connection if it exists
-    if (isset($mysqli)) {
-        $mysqli->close();
-    }
-    
-    exit(1);
-} 
+} else {
+    echo "✅ Keys directory already exists\n";
+}
+
+$mysqli->close();
+
+echo "\n🎉 Installation completed successfully!\n";
+echo "\nDefault login credentials:\n";
+echo "  Admin: admin / admin123\n";
+echo "  User:  user  / user123\n";
+echo "\nNext steps:\n";
+echo "1. Generate RSA keys for server communication\n";
+echo "2. Start your web server pointing to the 'public' directory\n";
+echo "3. Visit your application in the browser\n"; 

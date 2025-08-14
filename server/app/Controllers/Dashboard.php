@@ -4,212 +4,192 @@ namespace App\Controllers;
 
 use App\Models\UserModel;
 use App\Models\ServerModel;
-use App\Models\ServerKeyModel;
-use App\Libraries\ServerAgent;
+use App\Models\CommandHistoryModel;
 
 class Dashboard extends BaseController
 {
     protected $userModel;
     protected $serverModel;
-    protected $serverKeyModel;
-    protected $serverAgent;
+    protected $commandHistoryModel;
 
     public function __construct()
     {
         $this->userModel = new UserModel();
         $this->serverModel = new ServerModel();
-        $this->serverKeyModel = new ServerKeyModel();
-        $this->serverAgent = new ServerAgent();
+        $this->commandHistoryModel = new CommandHistoryModel();
     }
 
+    /**
+     * Main dashboard page
+     */
     public function index()
     {
         // Check if user is logged in
-        if (!session()->get('user_id')) {
+        if (!session()->get('isLoggedIn')) {
             return redirect()->to('/auth/login');
         }
 
         $data = [
-            'title' => 'Dashboard - Server Manager',
-            'user' => $this->userModel->find(session()->get('user_id')),
-            'servers' => $this->serverModel->where('is_active', true)->findAll(),
-            'total_servers' => $this->serverModel->where('is_active', true)->countAllResults(),
-            'online_servers' => $this->serverModel->where('is_active', true)->where('status', 'online')->countAllResults(),
+            'title' => 'Dashboard - Multi-Server Control Panel',
+            'user' => session()->get('user'),
+            'totalServers' => $this->serverModel->countAll(),
+            'onlineServers' => $this->serverModel->where('status', 'online')->countAllResults(),
+            'offlineServers' => $this->serverModel->where('status', 'offline')->countAllResults(),
+            'recentCommands' => $this->commandHistoryModel->orderBy('created_at', 'DESC')->limit(10)->find(),
+            'servers' => $this->serverModel->findAll()
         ];
 
         return view('dashboard/index', $data);
     }
 
+    /**
+     * Servers overview page
+     */
     public function servers()
     {
-        if (!session()->get('user_id')) {
+        if (!session()->get('isLoggedIn')) {
             return redirect()->to('/auth/login');
         }
 
         $data = [
-            'title' => 'Servers - Server Manager',
-            'user' => $this->userModel->find(session()->get('user_id')),
-            'servers' => $this->serverModel->where('is_active', true)->findAll(),
+            'title' => 'Servers - Multi-Server Control Panel',
+            'user' => session()->get('user'),
+            'servers' => $this->serverModel->findAll()
         ];
 
         return view('dashboard/servers', $data);
     }
 
-    public function server($id)
+    /**
+     * Individual server details page
+     */
+    public function server($id = null)
     {
-        if (!session()->get('user_id')) {
+        if (!session()->get('isLoggedIn')) {
             return redirect()->to('/auth/login');
+        }
+
+        if (!$id) {
+            return redirect()->to('/dashboard/servers');
         }
 
         $server = $this->serverModel->find($id);
         if (!$server) {
-            return redirect()->to('/dashboard/servers')->with('error', 'Server not found');
+            session()->setFlashdata('error', 'Server not found');
+            return redirect()->to('/dashboard/servers');
         }
 
-        // Get server status and info
-        $serverInfo = $this->serverAgent->getServerInfo($server);
-        
         $data = [
-            'title' => "Server: {$server['name']} - Server Manager",
-            'user' => $this->userModel->find(session()->get('user_id')),
-            'server' => $server,
-            'serverInfo' => $serverInfo,
+            'title' => 'Server: ' . $server['name'] . ' - Multi-Server Control Panel',
+            'user' => session()->get('user'),
+            'server' => $server
         ];
 
-        return view('dashboard/server_detail', $data);
+        return view('dashboard/server', $data);
     }
 
-    public function terminal($serverId)
+    /**
+     * Terminal access page
+     */
+    public function terminal()
     {
-        if (!session()->get('user_id')) {
+        if (!session()->get('isLoggedIn')) {
             return redirect()->to('/auth/login');
         }
 
-        $server = $this->serverModel->find($serverId);
-        if (!$server) {
-            return redirect()->to('/dashboard/servers')->with('error', 'Server not found');
-        }
-
         $data = [
-            'title' => "Terminal: {$server['name']} - Server Manager",
-            'user' => $this->userModel->find(session()->get('user_id')),
-            'server' => $server,
+            'title' => 'Terminal - Multi-Server Control Panel',
+            'user' => session()->get('user'),
+            'servers' => $this->serverModel->where('is_active', 1)->findAll()
         ];
 
         return view('dashboard/terminal', $data);
     }
 
-    public function apache2($serverId)
+    /**
+     * Apache2 management page
+     */
+    public function apache2()
     {
-        if (!session()->get('user_id')) {
+        if (!session()->get('isLoggedIn')) {
             return redirect()->to('/auth/login');
         }
 
-        $server = $this->serverModel->find($serverId);
-        if (!$server) {
-            return redirect()->to('/dashboard/servers')->with('error', 'Server not found');
-        }
-
-        // Get Apache2 information from server
-        $apache2Info = $this->serverAgent->getApache2Info($server);
-
         $data = [
-            'title' => "Apache2: {$server['name']} - Server Manager",
-            'user' => $this->userModel->find(session()->get('user_id')),
-            'server' => $server,
-            'apache2Info' => $apache2Info,
+            'title' => 'Apache2 Management - Multi-Server Control Panel',
+            'user' => session()->get('user'),
+            'servers' => $this->serverModel->where('is_active', 1)->findAll()
         ];
 
         return view('dashboard/apache2', $data);
     }
 
-    public function php_fpm($serverId)
+    /**
+     * PHP-FPM management page
+     */
+    public function php_fpm()
     {
-        if (!session()->get('user_id')) {
+        if (!session()->get('isLoggedIn')) {
             return redirect()->to('/auth/login');
         }
 
-        $server = $this->serverModel->find($serverId);
-        if (!$server) {
-            return redirect()->to('/dashboard/servers')->with('error', 'Server not found');
-        }
-
-        // Get PHP-FPM information from server
-        $phpInfo = $this->serverAgent->getPHPInfo($server);
-
         $data = [
-            'title' => "PHP-FPM: {$server['name']} - Server Manager",
-            'user' => $this->userModel->find(session()->get('user_id')),
-            'server' => $server,
-            'phpInfo' => $phpInfo,
+            'title' => 'PHP-FPM Management - Multi-Server Control Panel',
+            'user' => session()->get('user'),
+            'servers' => $this->serverModel->where('is_active', 1)->findAll()
         ];
 
         return view('dashboard/php_fpm', $data);
     }
 
-    public function services($serverId)
+    /**
+     * Services management page
+     */
+    public function services()
     {
-        if (!session()->get('user_id')) {
+        if (!session()->get('isLoggedIn')) {
             return redirect()->to('/auth/login');
         }
 
-        $server = $this->serverModel->find($serverId);
-        if (!$server) {
-            return redirect()->to('/dashboard/servers')->with('error', 'Server not found');
-        }
-
-        // Get services status from server
-        $servicesInfo = $this->serverAgent->getServicesStatus($server);
-
         $data = [
-            'title' => "Services: {$server['name']} - Server Manager",
-            'user' => $this->userModel->find(session()->get('user_id')),
-            'server' => $server,
-            'servicesInfo' => $servicesInfo,
+            'title' => 'Services Management - Multi-Server Control Panel',
+            'user' => session()->get('user'),
+            'servers' => $this->serverModel->where('is_active', 1)->findAll()
         ];
 
         return view('dashboard/services', $data);
     }
 
-    public function system($serverId)
+    /**
+     * System information page
+     */
+    public function system()
     {
-        if (!session()->get('user_id')) {
+        if (!session()->get('isLoggedIn')) {
             return redirect()->to('/auth/login');
         }
 
-        $server = $this->serverModel->find($serverId);
-        if (!$server) {
-            return redirect()->to('/dashboard/servers')->with('error', 'Server not found');
-        }
-
-        // Get system information from server
-        $systemInfo = $this->serverAgent->getSystemInfo($server);
-
         $data = [
-            'title' => "System: {$server['name']} - Server Manager",
-            'user' => $this->userModel->find(session()->get('user_id')),
-            'server' => $server,
-            'systemInfo' => $systemInfo,
+            'title' => 'System Information - Multi-Server Control Panel',
+            'user' => session()->get('user'),
+            'servers' => $this->serverModel->where('is_active', 1)->findAll()
         ];
 
         return view('dashboard/system', $data);
     }
 
+    /**
+     * Settings page
+     */
     public function settings()
     {
-        if (!session()->get('user_id')) {
+        if (!session()->get('isLoggedIn')) {
             return redirect()->to('/auth/login');
         }
 
-        $user = $this->userModel->find(session()->get('user_id'));
-        if ($user['role'] !== 'admin') {
-            return redirect()->to('/dashboard')->with('error', 'Access denied');
-        }
-
         $data = [
-            'title' => 'Settings - Server Manager',
-            'user' => $user,
-            'servers' => $this->serverModel->findAll(),
+            'title' => 'Settings - Multi-Server Control Panel',
+            'user' => session()->get('user')
         ];
 
         return view('dashboard/settings', $data);
