@@ -9,9 +9,9 @@ echo "=== Multi-Server Control Panel Installation ===\n\n";
 // Database connection parameters
 $host = 'localhost';
 $port = 33066;
-$username = 'simrs';
-$password = 'bismilah';
-$database = 'server_manager';
+$username = 'servermanager';
+$password = 'b15m1l4h';
+$database = 'servermanager';
 
 try {
     // Connect to database using MySQLi
