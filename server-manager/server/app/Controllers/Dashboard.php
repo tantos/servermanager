@@ -63,26 +63,22 @@ class Dashboard extends BaseController
     /**
      * Individual server details page
      */
-    public function server($id = null)
+    public function server($id)
     {
         if (!session()->get('isLoggedIn')) {
             return redirect()->to('/auth/login');
         }
 
-        if (!$id) {
-            return redirect()->to('/dashboard/servers');
-        }
-
         $server = $this->serverModel->find($id);
         if (!$server) {
-            session()->setFlashdata('error', 'Server not found');
-            return redirect()->to('/dashboard/servers');
+            return redirect()->to('/dashboard/servers')->with('error', 'Server not found');
         }
 
         $data = [
-            'title' => 'Server: ' . $server['name'] . ' - Multi-Server Control Panel',
+            'title' => 'Server Details - Multi-Server Control Panel',
             'user' => session()->get('user'),
-            'server' => $server
+            'server' => $server,
+            'recentCommands' => $this->commandHistoryModel->where('server_id', $id)->orderBy('created_at', 'DESC')->limit(20)->find()
         ];
 
         return view('dashboard/server', $data);
@@ -189,7 +185,8 @@ class Dashboard extends BaseController
 
         $data = [
             'title' => 'Settings - Multi-Server Control Panel',
-            'user' => session()->get('user')
+            'user' => session()->get('user'),
+            'servers' => $this->serverModel->findAll()
         ];
 
         return view('dashboard/settings', $data);

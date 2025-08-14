@@ -16,34 +16,48 @@
             min-height: 100vh;
             display: flex;
             align-items: center;
-            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         
         .login-card {
-            background: white;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
             border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
             overflow: hidden;
-            max-width: 400px;
             width: 100%;
+            max-width: 400px;
         }
         
         .login-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            text-align: center;
             padding: 2rem;
+            text-align: center;
+        }
+        
+        .server-icon {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            font-size: 2.5rem;
         }
         
         .login-header h1 {
-            margin: 0;
             font-size: 1.8rem;
-            font-weight: 700;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
         }
         
         .login-header p {
-            margin: 0.5rem 0 0 0;
+            margin: 0;
             opacity: 0.9;
+            font-size: 0.9rem;
         }
         
         .login-body {
@@ -54,16 +68,22 @@
             margin-bottom: 1rem;
         }
         
-        .form-control {
+        .form-floating .form-control {
             border-radius: 10px;
             border: 2px solid #e9ecef;
-            padding: 0.75rem 1rem;
+            padding: 1rem 0.75rem;
+            font-size: 1rem;
             transition: all 0.3s ease;
         }
         
-        .form-control:focus {
+        .form-floating .form-control:focus {
             border-color: #667eea;
             box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        
+        .form-floating label {
+            padding: 1rem 0.75rem;
+            color: #6c757d;
         }
         
         .btn-login {
@@ -71,6 +91,7 @@
             border: none;
             border-radius: 10px;
             padding: 0.75rem 2rem;
+            font-size: 1rem;
             font-weight: 600;
             width: 100%;
             transition: all 0.3s ease;
@@ -78,17 +99,7 @@
         
         .btn-login:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-        }
-        
-        .alert {
-            border-radius: 10px;
-            border: none;
-        }
-        
-        .server-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
         
         .floating-shapes {
@@ -103,30 +114,30 @@
         
         .shape {
             position: absolute;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 50%;
             animation: float 6s ease-in-out infinite;
         }
         
         .shape:nth-child(1) {
-            width: 80px;
-            height: 80px;
-            top: 20%;
+            width: 300px;
+            height: 300px;
+            top: 10%;
             left: 10%;
             animation-delay: 0s;
         }
         
         .shape:nth-child(2) {
-            width: 120px;
-            height: 120px;
+            width: 200px;
+            height: 200px;
             top: 60%;
             right: 10%;
             animation-delay: 2s;
         }
         
         .shape:nth-child(3) {
-            width: 60px;
-            height: 60px;
+            width: 150px;
+            height: 150px;
             bottom: 20%;
             left: 20%;
             animation-delay: 4s;
@@ -135,6 +146,23 @@
         @keyframes float {
             0%, 100% { transform: translateY(0px) rotate(0deg); }
             50% { transform: translateY(-20px) rotate(180deg); }
+        }
+        
+        .alert {
+            border-radius: 10px;
+            border: none;
+        }
+        
+        .alert-danger {
+            background: rgba(220, 53, 69, 0.1);
+            color: #dc3545;
+            border-left: 4px solid #dc3545;
+        }
+        
+        .alert-success {
+            background: rgba(40, 167, 69, 0.1);
+            color: #28a745;
+            border-left: 4px solid #28a745;
         }
     </style>
 </head>
@@ -192,7 +220,7 @@
                                 </label>
                             </div>
                             
-                            <button type="submit" class="btn btn-primary btn-login">
+                            <button type="submit" class="btn btn-login">
                                 <i class="bi bi-box-arrow-in-right"></i> Sign In
                             </button>
                         </form>

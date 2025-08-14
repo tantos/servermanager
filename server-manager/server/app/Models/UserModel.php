@@ -102,7 +102,7 @@ class UserModel extends Model
     }
 
     /**
-     * Get all active users
+     * Get active users
      */
     public function getActiveUsers()
     {
@@ -118,15 +118,6 @@ class UserModel extends Model
     }
 
     /**
-     * Check if user is admin
-     */
-    public function isAdmin($userId)
-    {
-        $user = $this->find($userId);
-        return $user && $user['role'] === 'admin';
-    }
-
-    /**
      * Update user password
      */
     public function updatePassword($userId, $newPassword)
@@ -136,18 +127,29 @@ class UserModel extends Model
     }
 
     /**
-     * Deactivate user
+     * Activate/deactivate user
      */
-    public function deactivateUser($userId)
+    public function toggleStatus($userId)
     {
-        return $this->update($userId, ['is_active' => 0]);
+        $user = $this->find($userId);
+        if ($user) {
+            $newStatus = $user['is_active'] ? 0 : 1;
+            return $this->update($userId, ['is_active' => $newStatus]);
+        }
+        return false;
     }
 
     /**
-     * Activate user
+     * Get user statistics
      */
-    public function activateUser($userId)
+    public function getUserStats()
     {
-        return $this->update($userId, ['is_active' => 1]);
+        return [
+            'total' => $this->countAll(),
+            'active' => $this->where('is_active', 1)->countAllResults(),
+            'inactive' => $this->where('is_active', 0)->countAllResults(),
+            'admins' => $this->where('role', 'admin')->countAllResults(),
+            'users' => $this->where('role', 'user')->countAllResults()
+        ];
     }
 } 

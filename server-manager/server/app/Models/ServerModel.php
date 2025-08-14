@@ -63,12 +63,6 @@ class ServerModel extends Model
             'greater_than' => 'Port must be greater than 0',
             'less_than' => 'Port must be less than 65536'
         ],
-        'description' => [
-            'max_length' => 'Description cannot exceed 500 characters'
-        ],
-        'os_info' => [
-            'max_length' => 'OS info cannot exceed 200 characters'
-        ],
         'status' => [
             'required' => 'Status is required',
             'in_list' => 'Status must be online, offline, or error'
@@ -83,19 +77,11 @@ class ServerModel extends Model
     protected $cleanValidationRules = true;
 
     /**
-     * Get all active servers
+     * Get active servers
      */
     public function getActiveServers()
     {
         return $this->where('is_active', 1)->findAll();
-    }
-
-    /**
-     * Get servers by status
-     */
-    public function getByStatus($status)
-    {
-        return $this->where('status', $status)->findAll();
     }
 
     /**
@@ -115,11 +101,11 @@ class ServerModel extends Model
     }
 
     /**
-     * Get servers with errors
+     * Get servers by status
      */
-    public function getErrorServers()
+    public function getByStatus($status)
     {
-        return $this->where('status', 'error')->where('is_active', 1)->findAll();
+        return $this->where('status', $status)->where('is_active', 1)->findAll();
     }
 
     /**
@@ -128,38 +114,18 @@ class ServerModel extends Model
     public function updateStatus($serverId, $status, $lastSeen = null)
     {
         $data = ['status' => $status];
-        
         if ($lastSeen) {
             $data['last_seen'] = $lastSeen;
-        } else {
-            $data['last_seen'] = date('Y-m-d H:i:s');
         }
-
         return $this->update($serverId, $data);
     }
 
     /**
-     * Mark server as online
+     * Update server last seen
      */
-    public function markOnline($serverId)
+    public function updateLastSeen($serverId)
     {
-        return $this->updateStatus($serverId, 'online');
-    }
-
-    /**
-     * Mark server as offline
-     */
-    public function markOffline($serverId)
-    {
-        return $this->updateStatus($serverId, 'offline');
-    }
-
-    /**
-     * Mark server as error
-     */
-    public function markError($serverId)
-    {
-        return $this->updateStatus($serverId, 'error');
+        return $this->update($serverId, ['last_seen' => date('Y-m-d H:i:s')]);
     }
 
     /**
@@ -179,34 +145,6 @@ class ServerModel extends Model
     }
 
     /**
-     * Check if server exists by IP
-     */
-    public function serverExistsByIp($ipAddress, $excludeId = null)
-    {
-        $query = $this->where('ip_address', $ipAddress);
-        
-        if ($excludeId) {
-            $query->where('id !=', $excludeId);
-        }
-        
-        return $query->countAllResults() > 0;
-    }
-
-    /**
-     * Check if server exists by hostname
-     */
-    public function serverExistsByHostname($hostname, $excludeId = null)
-    {
-        $query = $this->where('hostname', $hostname);
-        
-        if ($excludeId) {
-            $query->where('id !=', $excludeId);
-        }
-        
-        return $query->countAllResults() > 0;
-    }
-
-    /**
      * Get server statistics
      */
     public function getServerStats()
@@ -223,12 +161,34 @@ class ServerModel extends Model
     /**
      * Search servers
      */
-    public function searchServers($searchTerm)
+    public function searchServers($query)
     {
-        return $this->like('name', $searchTerm)
-                    ->orLike('hostname', $searchTerm)
-                    ->orLike('ip_address', $searchTerm)
-                    ->orLike('description', $searchTerm)
+        return $this->like('name', $query)
+                    ->orLike('hostname', $query)
+                    ->orLike('ip_address', $query)
+                    ->orLike('description', $query)
                     ->findAll();
+    }
+
+    /**
+     * Get servers with recent activity
+     */
+    public function getServersWithRecentActivity($days = 7)
+    {
+        $date = date('Y-m-d H:i:s', strtotime("-{$days} days"));
+        return $this->where('last_seen >=', $date)->findAll();
+    }
+
+    /**
+     * Activate/deactivate server
+     */
+    public function toggleStatus($serverId)
+    {
+        $server = $this->find($serverId);
+        if ($server) {
+            $newStatus = $server['is_active'] ? 0 : 1;
+            return $this->update($serverId, ['is_active' => $newStatus]);
+        }
+        return false;
     }
 } 

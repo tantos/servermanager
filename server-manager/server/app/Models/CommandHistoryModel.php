@@ -29,6 +29,7 @@ class CommandHistoryModel extends Model
     protected $useTimestamps = true;
     protected $dateFormat = 'datetime';
     protected $createdField = 'created_at';
+    protected $updatedField = 'updated_at';
 
     // Validation
     protected $validationRules = [
@@ -63,69 +64,25 @@ class CommandHistoryModel extends Model
     protected $cleanValidationRules = true;
 
     /**
-     * Get command history for a specific server
+     * Get commands by server
      */
-    public function getByServer($serverId, $limit = null)
+    public function getByServer($serverId, $limit = 50)
     {
-        $query = $this->where('server_id', $serverId)->orderBy('created_at', 'DESC');
-        
-        if ($limit) {
-            $query->limit($limit);
-        }
-        
-        return $query->findAll();
+        return $this->where('server_id', $serverId)
+                    ->orderBy('created_at', 'DESC')
+                    ->limit($limit)
+                    ->findAll();
     }
 
     /**
-     * Get command history for a specific user
+     * Get commands by user
      */
-    public function getByUser($userId, $limit = null)
+    public function getByUser($userId, $limit = 50)
     {
-        $query = $this->where('user_id', $userId)->orderBy('created_at', 'DESC');
-        
-        if ($limit) {
-            $query->limit($limit);
-        }
-        
-        return $query->findAll();
-    }
-
-    /**
-     * Get commands by status
-     */
-    public function getByStatus($status, $limit = null)
-    {
-        $query = $this->where('status', $status)->orderBy('created_at', 'DESC');
-        
-        if ($limit) {
-            $query->limit($limit);
-        }
-        
-        return $query->findAll();
-    }
-
-    /**
-     * Get successful commands
-     */
-    public function getSuccessfulCommands($limit = null)
-    {
-        return $this->getByStatus('success', $limit);
-    }
-
-    /**
-     * Get failed commands
-     */
-    public function getFailedCommands($limit = null)
-    {
-        return $this->getByStatus('error', $limit);
-    }
-
-    /**
-     * Get timed out commands
-     */
-    public function getTimedOutCommands($limit = null)
-    {
-        return $this->getByStatus('timeout', $limit);
+        return $this->where('user_id', $userId)
+                    ->orderBy('created_at', 'DESC')
+                    ->limit($limit)
+                    ->findAll();
     }
 
     /**
@@ -137,20 +94,25 @@ class CommandHistoryModel extends Model
     }
 
     /**
-     * Search command history
+     * Get commands by status
      */
-    public function searchCommands($searchTerm, $limit = null)
+    public function getByStatus($status, $limit = 50)
     {
-        $query = $this->like('command', $searchTerm)
-                      ->orLike('output', $searchTerm)
-                      ->orLike('error', $searchTerm)
-                      ->orderBy('created_at', 'DESC');
-        
-        if ($limit) {
-            $query->limit($limit);
-        }
-        
-        return $query->findAll();
+        return $this->where('status', $status)
+                    ->orderBy('created_at', 'DESC')
+                    ->limit($limit)
+                    ->findAll();
+    }
+
+    /**
+     * Get failed commands
+     */
+    public function getFailedCommands($limit = 50)
+    {
+        return $this->whereIn('status', ['error', 'timeout'])
+                    ->orderBy('created_at', 'DESC')
+                    ->limit($limit)
+                    ->findAll();
     }
 
     /**
@@ -193,58 +155,64 @@ class CommandHistoryModel extends Model
     }
 
     /**
+     * Search commands
+     */
+    public function searchCommands($query, $limit = 50)
+    {
+        return $this->like('command', $query)
+                    ->orLike('output', $query)
+                    ->orLike('error', $query)
+                    ->orderBy('created_at', 'DESC')
+                    ->limit($limit)
+                    ->findAll();
+    }
+
+    /**
+     * Get commands by date range
+     */
+    public function getByDateRange($startDate, $endDate, $limit = 100)
+    {
+        return $this->where('created_at >=', $startDate)
+                    ->where('created_at <=', $endDate)
+                    ->orderBy('created_at', 'DESC')
+                    ->limit($limit)
+                    ->findAll();
+    }
+
+    /**
+     * Get commands with long execution time
+     */
+    public function getLongRunningCommands($threshold = 10, $limit = 50)
+    {
+        return $this->where('execution_time >', $threshold)
+                    ->orderBy('execution_time', 'DESC')
+                    ->limit($limit)
+                    ->findAll();
+    }
+
+    /**
      * Clean old command history
      */
     public function cleanOldHistory($days = 30)
     {
-        $cutoffDate = date('Y-m-d H:i:s', strtotime("-{$days} days"));
-        return $this->where('created_at <', $cutoffDate)->delete();
+        $date = date('Y-m-d H:i:s', strtotime("-{$days} days"));
+        return $this->where('created_at <', $date)->delete();
     }
 
     /**
-     * Get average execution time
+     * Get command history summary
      */
-    public function getAverageExecutionTime()
+    public function getHistorySummary($days = 7)
     {
-        $result = $this->select('AVG(execution_time) as avg_time')
-                       ->where('execution_time IS NOT NULL')
-                       ->first();
+        $date = date('Y-m-d H:i:s', strtotime("-{$days} days"));
         
-        return $result ? $result['avg_time'] : 0;
-    }
-
-    /**
-     * Get commands executed today
-     */
-    public function getCommandsToday()
-    {
-        $today = date('Y-m-d');
-        return $this->where('DATE(created_at)', $today)->countAllResults();
-    }
-
-    /**
-     * Get commands executed this week
-     */
-    public function getCommandsThisWeek()
-    {
-        $weekStart = date('Y-m-d', strtotime('monday this week'));
-        $weekEnd = date('Y-m-d', strtotime('sunday this week'));
-        
-        return $this->where('DATE(created_at) >=', $weekStart)
-                    ->where('DATE(created_at) <=', $weekEnd)
-                    ->countAllResults();
-    }
-
-    /**
-     * Get commands executed this month
-     */
-    public function getCommandsThisMonth()
-    {
-        $monthStart = date('Y-m-01');
-        $monthEnd = date('Y-m-t');
-        
-        return $this->where('DATE(created_at) >=', $monthStart)
-                    ->where('DATE(created_at) <=', $monthEnd)
-                    ->countAllResults();
+        return $this->select('DATE(created_at) as date, COUNT(*) as total, 
+                             SUM(CASE WHEN status = "success" THEN 1 ELSE 0 END) as success,
+                             SUM(CASE WHEN status = "error" THEN 1 ELSE 0 END) as error,
+                             SUM(CASE WHEN status = "timeout" THEN 1 ELSE 0 END) as timeout')
+                    ->where('created_at >=', $date)
+                    ->groupBy('DATE(created_at)')
+                    ->orderBy('date', 'DESC')
+                    ->findAll();
     }
 } 
