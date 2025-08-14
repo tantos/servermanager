@@ -11,6 +11,46 @@ class App extends BaseConfig
 {
     /**
      * --------------------------------------------------------------------------
+     * Base Site URL
+     * --------------------------------------------------------------------------
+     *
+     * URL to your CodeIgniter root. Typically, this will be your base URL,
+     * WITH a trailing slash:
+     *
+     * E.g., http://example.com/
+     */
+    public string $baseURL = '';
+
+    /**
+     * --------------------------------------------------------------------------
+     * Index File
+     * --------------------------------------------------------------------------
+     *
+     * Typically, this will be your `index.php` file, unless you've renamed it to
+     * something else. If you have configured your web server to remove this file
+     * from your site URIs, set this variable to an empty string.
+     */
+    public string $indexPage = 'index.php';
+
+    /**
+     * --------------------------------------------------------------------------
+     * URI PROTOCOL
+     * --------------------------------------------------------------------------
+     *
+     * This item determines which server global should be used to retrieve the
+     * URI string. The default setting of 'REQUEST_URI' works for most servers.
+     * If your links do not seem to work, try one of the other delicious flavors:
+     *
+     *  'REQUEST_URI': Uses $_SERVER['REQUEST_URI']
+     * 'QUERY_STRING': Uses $_SERVER['QUERY_STRING']
+     *    'PATH_INFO': Uses $_SERVER['PATH_INFO']
+     *
+     * WARNING: If you set this to 'PATH_INFO', URIs will always be URL-decoded!
+     */
+    public string $uriProtocol = 'REQUEST_URI';
+
+    /**
+     * --------------------------------------------------------------------------
      * Default Timezone
      * --------------------------------------------------------------------------
      *
@@ -18,7 +58,7 @@ class App extends BaseConfig
      * converting dates and times. This should match the timezone set in
      * your server configuration.
      */
-    public $appTimezone = 'UTC';
+    public string $appTimezone = 'UTC';
 
     /**
      * --------------------------------------------------------------------------
@@ -29,7 +69,7 @@ class App extends BaseConfig
      * Request class to ensure that the language, numbers, dates, etc.
      * are correctly formatted.
      */
-    public $defaultLocale = 'en';
+    public string $defaultLocale = 'en';
 
     /**
      * --------------------------------------------------------------------------
@@ -42,7 +82,7 @@ class App extends BaseConfig
      *
      * If false, no automatic detection will be performed.
      */
-    public $negotiateLocale = false;
+    public bool $negotiateLocale = false;
 
     /**
      * --------------------------------------------------------------------------
@@ -52,9 +92,9 @@ class App extends BaseConfig
      * Contains all languages your application supports. This can be used
      * by the `negotiateLocale()` method to pick the best locale.
      *
-     * @var string[]
+     * @var list<string>
      */
-    public $supportedLocales = ['en'];
+    public array $supportedLocales = ['en'];
 
     /**
      * --------------------------------------------------------------------------
@@ -64,7 +104,7 @@ class App extends BaseConfig
      * This determines the default character set used in various methods
      * that require a character set to be provided.
      */
-    public $charset = 'UTF-8';
+    public string $charset = 'UTF-8';
 
     /**
      * --------------------------------------------------------------------------
@@ -76,7 +116,30 @@ class App extends BaseConfig
      * secure, the user will be redirected to a secure version of the page
      * and the HTTP Strict Transport Security header will be set.
      */
-    public $forceGlobalSecureRequests = false;
+    public bool $forceGlobalSecureRequests = false;
+
+    /**
+     * --------------------------------------------------------------------------
+     * Reverse Proxy IPs
+     * --------------------------------------------------------------------------
+     *
+     * If your server is behind a reverse proxy, you must whitelist the proxy
+     * IP addresses from which CodeIgniter should trust headers such as
+     * X-Forwarded-For or Client-IP in order to properly identify
+     * the visitor's IP address.
+     *
+     * You need to set a proxy IP address or IP address with subnets and
+     * the HTTP header for the client IP address.
+     *
+     * Here are some examples:
+     *     [
+     *         '10.0.1.200'     => 'X-Forwarded-For',
+     *         '192.168.5.0/24' => 'X-Real-IP',
+     *     ]
+     *
+     * @var array<string, string>
+     */
+    public array $proxyIPs = [];
 
     /**
      * --------------------------------------------------------------------------
@@ -84,29 +147,57 @@ class App extends BaseConfig
      * --------------------------------------------------------------------------
      *
      * Enables the Response's Content Secure Policy to restrict the sources that
-     * can be used for images, scripts, CSS files, audio, and more. If enabled,
+     * can be used for images, scripts, CSS files, audio, video, etc. If enabled,
      * the Response object will populate default values for the policy from the
-     * `ContentSecurityPolicy.php` file. Passing a non-empty value to `enableCSP()`
-     * will override the default values.
+     * `ContentSecurityPolicy.php` file. Controllers can always add to those
+     * restrictions at run time.
+     *
+     * For a better understanding of CSP, see these documents:
+     *
+     * @see http://www.html5rocks.com/en/tutorials/security/content-security-policy/
+     * @see http://www.w3.org/TR/CSP/
      */
-    public $CSPEnabled = false;
+    public bool $CSPEnabled = false;
+
+    /**
+     * --------------------------------------------------------------------------
+     * Allowed URL Characters
+     * --------------------------------------------------------------------------
+     *
+     * This lets you specify which characters are permitted within your URLs.
+     * When someone tries to submit a URL with disallowed characters they will
+     * get a warning message.
+     *
+     * As a security measure you are STRONGLY encouraged to restrict URLs to
+     * as few characters as possible.
+     *
+     * By default, only these are allowed: `a-z 0-9~%.:_-`
+     *
+     * Set an empty string to allow all characters -- but only if you are insane.
+     *
+     * The configured value is actually a regular expression character group
+     * and it will be used as: '/\A[<permittedURIChars>]+\z/iu'
+     *
+     * DO NOT CHANGE THIS UNLESS YOU FULLY UNDERSTAND THE REPERCUSSIONS!!
+     */
+    public string $permittedURIChars = 'a-z 0-9~%.:_\-';
 
     /**
      * --------------------------------------------------------------------------
      * RSA Keys Configuration
      * --------------------------------------------------------------------------
      */
-    public $rsaPrivateKeyPath;
-    public $rsaPublicKeyPath;
+    public string $rsaPrivateKeyPath = 'keys/private_key.pem';
+    public string $rsaPublicKeyPath = 'keys/public_key.pem';
 
     /**
      * --------------------------------------------------------------------------
      * Server Agent Configuration
      * --------------------------------------------------------------------------
      */
-    public $agentDefaultPort = 6969;
-    public $agentTimeout = 30;
-    public $agentMaxRetries = 3;
+    public int $agentDefaultPort = 6969;
+    public int $agentTimeout = 30;
+    public int $agentMaxRetries = 3;
 
     /**
      * --------------------------------------------------------------------------
@@ -142,6 +233,11 @@ class App extends BaseConfig
                         $value = $matches[2];
                     }
                     
+                    // Set baseURL if specified
+                    if ($key === 'app.baseURL') {
+                        $this->baseURL = $value;
+                    }
+                    
                     // Set RSA key paths
                     if ($key === 'RSA_PRIVATE_KEY_PATH') {
                         $this->rsaPrivateKeyPath = $value;
@@ -165,23 +261,23 @@ class App extends BaseConfig
     /**
      * Get RSA private key path
      */
-    public function getRsaPrivateKeyPath()
+    public function getRsaPrivateKeyPath(): string
     {
-        return $this->rsaPrivateKeyPath ?? 'keys/private_key.pem';
+        return $this->rsaPrivateKeyPath;
     }
 
     /**
      * Get RSA public key path
      */
-    public function getRsaPublicKeyPath()
+    public function getRsaPublicKeyPath(): string
     {
-        return $this->rsaPublicKeyPath ?? 'keys/public_key.pem';
+        return $this->rsaPublicKeyPath;
     }
 
     /**
      * Get agent default port
      */
-    public function getAgentDefaultPort()
+    public function getAgentDefaultPort(): int
     {
         return $this->agentDefaultPort;
     }
@@ -189,7 +285,7 @@ class App extends BaseConfig
     /**
      * Get agent timeout
      */
-    public function getAgentTimeout()
+    public function getAgentTimeout(): int
     {
         return $this->agentTimeout;
     }
@@ -197,7 +293,7 @@ class App extends BaseConfig
     /**
      * Get agent max retries
      */
-    public function getAgentMaxRetries()
+    public function getAgentMaxRetries(): int
     {
         return $this->agentMaxRetries;
     }
