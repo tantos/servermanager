@@ -10,8 +10,8 @@ echo "=== Multi-Server Control Panel Installation ===\n\n";
 $host = 'localhost';
 $port = 33066;
 $username = 'simrs';
-$password = 'bismilah';
-$database = 'server_manager';
+$password = 'b15m1l4h';
+$database = 'servermanager';
 
 try {
     // Connect to database
