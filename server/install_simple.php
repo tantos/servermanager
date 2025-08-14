@@ -1,7 +1,7 @@
 <?php
 /**
  * Simple Installation Script for Multi-Server Control Panel
- * Sets up database and tables manually
+ * Sets up database and tables manually using MySQLi
  */
 
 echo "=== Multi-Server Control Panel Installation ===\n\n";
@@ -10,15 +10,22 @@ echo "=== Multi-Server Control Panel Installation ===\n\n";
 $host = 'localhost';
 $port = 33066;
 $username = 'simrs';
-$password = 'b15m1l4h';
-$database = 'servermanager';
+$password = 'bismilah';
+$database = 'server_manager';
 
 try {
-    // Connect to database
+    // Connect to database using MySQLi
     echo "1. Testing database connection...\n";
     
-    $pdo = new PDO("mysql:host=$host;port=$port;dbname=$database;charset=utf8mb4", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $mysqli = new mysqli($host, $username, $password, $database, $port);
+    
+    // Check connection
+    if ($mysqli->connect_error) {
+        throw new Exception("Connection failed: " . $mysqli->connect_error);
+    }
+    
+    // Set charset
+    $mysqli->set_charset("utf8mb4");
     
     echo "   ✓ Database connection successful\n";
     
@@ -28,11 +35,7 @@ try {
     $tables = ['command_history', 'server_sites', 'server_keys', 'servers', 'users'];
     
     foreach ($tables as $table) {
-        try {
-            $pdo->exec("DROP TABLE IF EXISTS `$table`");
-        } catch (Exception $e) {
-            // Ignore errors if table doesn't exist
-        }
+        $mysqli->query("DROP TABLE IF EXISTS `$table`");
     }
     
     echo "   ✓ Database prepared for clean installation\n";
@@ -55,12 +58,14 @@ try {
         PRIMARY KEY (`id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
     
-    $pdo->exec($sql);
+    if (!$mysqli->query($sql)) {
+        throw new Exception("Failed to create users table: " . $mysqli->error);
+    }
     echo "   ✓ Users table created\n";
     
     // Add unique constraints after table creation
-    $pdo->exec("ALTER TABLE `users` ADD UNIQUE KEY `username` (`username`)");
-    $pdo->exec("ALTER TABLE `users` ADD UNIQUE KEY `email` (`email`)");
+    $mysqli->query("ALTER TABLE `users` ADD UNIQUE KEY `username` (`username`)");
+    $mysqli->query("ALTER TABLE `users` ADD UNIQUE KEY `email` (`email`)");
     
     // Servers table
     $sql = "CREATE TABLE `servers` (
@@ -79,13 +84,15 @@ try {
         PRIMARY KEY (`id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
     
-    $pdo->exec($sql);
+    if (!$mysqli->query($sql)) {
+        throw new Exception("Failed to create servers table: " . $mysqli->error);
+    }
     echo "   ✓ Servers table created\n";
     
     // Add indexes after table creation
-    $pdo->exec("ALTER TABLE `servers` ADD KEY `hostname` (`hostname`)");
-    $pdo->exec("ALTER TABLE `servers` ADD KEY `ip_address` (`ip_address`)");
-    $pdo->exec("ALTER TABLE `servers` ADD KEY `status` (`status`)");
+    $mysqli->query("ALTER TABLE `servers` ADD KEY `hostname` (`hostname`)");
+    $mysqli->query("ALTER TABLE `servers` ADD KEY `ip_address` (`ip_address`)");
+    $mysqli->query("ALTER TABLE `servers` ADD KEY `status` (`status`)");
     
     // Server keys table
     $sql = "CREATE TABLE `server_keys` (
@@ -104,7 +111,9 @@ try {
         KEY `fingerprint` (`fingerprint`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
     
-    $pdo->exec($sql);
+    if (!$mysqli->query($sql)) {
+        throw new Exception("Failed to create server_keys table: " . $mysqli->error);
+    }
     echo "   ✓ Server keys table created\n";
     
     // Server sites table
@@ -128,7 +137,9 @@ try {
         KEY `is_enabled` (`is_enabled`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
     
-    $pdo->exec($sql);
+    if (!$mysqli->query($sql)) {
+        throw new Exception("Failed to create server_sites table: " . $mysqli->error);
+    }
     echo "   ✓ Server sites table created\n";
     
     // Command history table
@@ -152,20 +163,49 @@ try {
         KEY `created_at` (`created_at`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
     
-    $pdo->exec($sql);
+    if (!$mysqli->query($sql)) {
+        throw new Exception("Failed to create command_history table: " . $mysqli->error);
+    }
     echo "   ✓ Command history table created\n";
     
     // Insert default users
     echo "\n4. Creating default users...\n";
     
-    $sql = "INSERT INTO users (username, email, password_hash, full_name, role, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())";
-    $stmt = $pdo->prepare($sql);
+    $stmt = $mysqli->prepare("INSERT INTO users (username, email, password_hash, full_name, role, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())");
     
-    $stmt->execute(['admin', 'admin@server-manager.local', password_hash('admin123', PASSWORD_DEFAULT), 'System Administrator', 'admin', 1]);
+    if (!$stmt) {
+        throw new Exception("Failed to prepare statement: " . $mysqli->error);
+    }
+    
+    $stmt->bind_param("sssssi", $username, $email, $password_hash, $full_name, $role, $is_active);
+    
+    // Admin user
+    $username = 'admin';
+    $email = 'admin@server-manager.local';
+    $password_hash = password_hash('admin123', PASSWORD_DEFAULT);
+    $full_name = 'System Administrator';
+    $role = 'admin';
+    $is_active = 1;
+    
+    if (!$stmt->execute()) {
+        throw new Exception("Failed to create admin user: " . $stmt->error);
+    }
     echo "   ✓ Admin user created\n";
     
-    $stmt->execute(['user', 'user@server-manager.local', password_hash('user123', PASSWORD_DEFAULT), 'Regular User', 'user', 1]);
+    // Regular user
+    $username = 'user';
+    $email = 'user@server-manager.local';
+    $password_hash = password_hash('user123', PASSWORD_DEFAULT);
+    $full_name = 'Regular User';
+    $role = 'user';
+    $is_active = 1;
+    
+    if (!$stmt->execute()) {
+        throw new Exception("Failed to create regular user: " . $stmt->error);
+    }
     echo "   ✓ Regular user created\n";
+    
+    $stmt->close();
     
     // Create necessary directories
     echo "\n5. Creating necessary directories...\n";
@@ -222,6 +262,9 @@ try {
     
     echo "   ✓ File permissions set correctly\n";
     
+    // Close database connection
+    $mysqli->close();
+    
     // Installation complete
     echo "\n=== Installation Complete! ===\n\n";
     
@@ -251,6 +294,12 @@ try {
     echo "1. Database connection settings\n";
     echo "2. Database server is running\n";
     echo "3. User has sufficient privileges\n";
-    echo "4. PHP extensions: openssl, pdo_mysql\n";
+    echo "4. PHP extensions: openssl, mysqli\n";
+    
+    // Close connection if it exists
+    if (isset($mysqli)) {
+        $mysqli->close();
+    }
+    
     exit(1);
 } 
