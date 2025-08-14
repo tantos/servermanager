@@ -2,20 +2,55 @@
 /**
  * Simple Installation Script for Multi-Server Control Panel
  * Sets up database and tables manually using MySQLi
+ * Configuration is read from .env file
  */
 
 echo "=== Multi-Server Control Panel Installation ===\n\n";
 
-// Database connection parameters
-$host = 'localhost';
-$port = 33066;
-$username = 'servermanager';
-$password = 'b15m1l4h';
-$database = 'servermanager';
+// Load environment variables from .env file
+function loadEnv($file) {
+    if (!file_exists($file)) {
+        throw new Exception(".env file not found. Please create it first.");
+    }
+    
+    $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $env = [];
+    
+    foreach ($lines as $line) {
+        if (strpos($line, '=') !== false && strpos($line, '#') !== 0) {
+            list($key, $value) = explode('=', $line, 2);
+            $key = trim($key);
+            $value = trim($value);
+            
+            // Remove quotes if present
+            if (preg_match('/^(["\'])(.*)\1$/', $value, $matches)) {
+                $value = $matches[2];
+            }
+            
+            $env[$key] = $value;
+        }
+    }
+    
+    return $env;
+}
 
 try {
+    // Load .env file
+    echo "1. Loading configuration from .env file...\n";
+    $env = loadEnv('.env');
+    
+    // Extract database configuration
+    $host = $env['database.default.hostname'] ?? 'localhost';
+    $port = (int)($env['database.default.port'] ?? 3306);
+    $username = $env['database.default.username'] ?? 'root';
+    $password = $env['database.default.password'] ?? '';
+    $database = $env['database.default.database'] ?? 'servermanager';
+    
+    echo "   ✓ Configuration loaded successfully\n";
+    echo "   Database: {$database} on {$host}:{$port}\n";
+    
     // Connect to database using MySQLi
-    echo "1. Testing database connection...\n";
+    echo "\n2. Testing database connection...\n";
     
     $mysqli = new mysqli($host, $username, $password, $database, $port);
     
@@ -30,7 +65,7 @@ try {
     echo "   ✓ Database connection successful\n";
     
     // Drop existing tables if they exist (clean install)
-    echo "\n2. Preparing database...\n";
+    echo "\n3. Preparing database...\n";
     
     $tables = ['command_history', 'server_sites', 'server_keys', 'servers', 'users'];
     
@@ -41,7 +76,7 @@ try {
     echo "   ✓ Database prepared for clean installation\n";
     
     // Create tables
-    echo "\n3. Creating database tables...\n";
+    echo "\n4. Creating database tables...\n";
     
     // Users table
     $sql = "CREATE TABLE `users` (
@@ -169,7 +204,7 @@ try {
     echo "   ✓ Command history table created\n";
     
     // Insert default users
-    echo "\n4. Creating default users...\n";
+    echo "\n5. Creating default users...\n";
     
     $stmt = $mysqli->prepare("INSERT INTO users (username, email, password_hash, full_name, role, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())");
     
@@ -208,7 +243,7 @@ try {
     $stmt->close();
     
     // Create necessary directories
-    echo "\n5. Creating necessary directories...\n";
+    echo "\n6. Creating necessary directories...\n";
     
     $dirs = [
         'writable/logs',
@@ -228,10 +263,10 @@ try {
     }
     
     // Generate RSA keys for control panel
-    echo "\n6. Generating RSA keys for control panel...\n";
+    echo "\n7. Generating RSA keys for control panel...\n";
     
-    $privateKeyPath = 'keys/private_key.pem';
-    $publicKeyPath = 'keys/public_key.pem';
+    $privateKeyPath = $env['RSA_PRIVATE_KEY_PATH'] ?? 'keys/private_key.pem';
+    $publicKeyPath = $env['RSA_PUBLIC_KEY_PATH'] ?? 'keys/public_key.pem';
     
     if (!file_exists($privateKeyPath)) {
         $config = [
@@ -254,7 +289,7 @@ try {
     }
     
     // Set proper permissions
-    echo "\n7. Setting file permissions...\n";
+    echo "\n8. Setting file permissions...\n";
     
     chmod($privateKeyPath, 0600);
     chmod($publicKeyPath, 0644);
@@ -291,10 +326,11 @@ try {
 } catch (Exception $e) {
     echo "❌ Installation failed: " . $e->getMessage() . "\n";
     echo "\nPlease check:\n";
-    echo "1. Database connection settings\n";
-    echo "2. Database server is running\n";
-    echo "3. User has sufficient privileges\n";
-    echo "4. PHP extensions: openssl, mysqli\n";
+    echo "1. .env file exists and is properly configured\n";
+    echo "2. Database connection settings in .env file\n";
+    echo "3. Database server is running\n";
+    echo "4. User has sufficient privileges\n";
+    echo "5. PHP extensions: openssl, mysqli\n";
     
     // Close connection if it exists
     if (isset($mysqli)) {
