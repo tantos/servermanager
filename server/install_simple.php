@@ -253,4 +253,4 @@ echo "  User:  user  / user123\n";
 echo "\nNext steps:\n";
 echo "1. Generate RSA keys for server communication\n";
 echo "2. Start your web server pointing to the 'public' directory\n";
-echo "3. Visit your application in the browser\n"; 
+echo "3. Visit your application in the browser\n";

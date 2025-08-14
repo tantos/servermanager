@@ -68,4 +68,4 @@ if ($result->num_rows > 0) {
 $mysqli->close();
 
 echo "\n✅ Database setup completed successfully!\n";
-echo "You can now run the installation script.\n"; 
+echo "You can now run the installation script.\n";
