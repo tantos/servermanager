@@ -17,3 +17,8 @@
 2025-08-14 11:02:38,931 - werkzeug - INFO - 127.0.0.1 - - [14/Aug/2025 11:02:38] "GET /health HTTP/1.1" 200 -
 2025-08-14 11:02:38,932 - werkzeug - INFO - 127.0.0.1 - - [14/Aug/2025 11:02:38] "[31m[1mGET /api/services/status HTTP/1.1[0m" 401 -
 2025-08-14 11:02:38,933 - werkzeug - INFO - 127.0.0.1 - - [14/Aug/2025 11:02:38] "[31m[1mGET /api/apache2/sites HTTP/1.1[0m" 401 -
+2025-08-14 11:03:54,936 - __main__ - INFO - Starting Server Agent on 0.0.0.0:6969
+2025-08-14 11:03:54,936 - __main__ - INFO - RSA keys loaded from: keys/private_key.pem
+2025-08-14 11:04:00,051 - werkzeug - INFO - 127.0.0.1 - - [14/Aug/2025 11:04:00] "GET /health HTTP/1.1" 200 -
+2025-08-14 11:04:00,052 - werkzeug - INFO - 127.0.0.1 - - [14/Aug/2025 11:04:00] "[31m[1mGET /api/services/status HTTP/1.1[0m" 401 -
+2025-08-14 11:04:00,053 - werkzeug - INFO - 127.0.0.1 - - [14/Aug/2025 11:04:00] "[31m[1mGET /api/apache2/sites HTTP/1.1[0m" 401 -
